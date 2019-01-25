@@ -1,0 +1,131 @@
+<!-- vim: set ft=xml noet : -->
+<launch>
+
+<!-- example launch script for PX4 based FCU's -->
+<arg name="fcu_url" default="/dev/ttyTHS2:921600" />
+<!-- <arg name="fcu_url" default="/dev/ttyACM0:921600" /> -->
+<arg name="gcs_url" default="" />
+<arg name="tgt_system" default="1" />
+<arg name="tgt_component" default="1" />
+<arg name="log_output" default="log" />
+<arg name="pluginlists_yaml" default="/etc/ddd/run/mav/px4_pluginlists.yaml" />
+<arg name="config_yaml" default="/etc/ddd/run/mav/px4_config.yaml" />
+
+<node pkg="mavros" type="mavros_node" name="ddd_mav" required="true" clear_params="true" output="$(arg log_output)" launch-prefix="taskset -c 4">
+	<param name="fcu_url" value="$(arg fcu_url)" />
+	<param name="gcs_url" value="$(arg gcs_url)" />
+	<param name="target_system_id" value="$(arg tgt_system)" />
+	<param name="target_component_id" value="$(arg tgt_component)" />
+	<rosparam command="load" file="$(arg pluginlists_yaml)" />
+	<rosparam command="load" file="$(arg config_yaml)" />
+</node>
+
+
+
+<!-- Start Ueye cam -->
+  <arg name="nodelet_manager_name_cam0" value="nodelet_manager_cam0" />
+  <arg name="camera_name_cam0" value="cam0" />
+
+  <node pkg="nodelet" type="nodelet" name="$(arg nodelet_manager_name_cam0)" args="manager" output="log"/>
+  <node pkg="nodelet" type="nodelet" name="ddd_cam_nodelet_cam0" args="load ueye_cam/ueye_cam_nodelet $(arg nodelet_manager_name_cam0)" output="log" launch-prefix="taskset -c 1">
+    
+    <param name="camera_name" type="str" value="$(arg camera_name_cam0)" /> <!-- == namespace for topics and services -->
+    <param name="camera_topic" type="str" value="image_raw" />
+    <param name="camera_id" type="int" value="1" /> <!-- 0 = any camera; 1+: camera ID -->
+    <param name="frame_name" type="str" value="camera" /> <!-- frame_id in image_raw header -->
+
+    <param name="ext_trigger_mode" type="bool" value="True" />
+    <param name="color_mode" type="str" value="mono8" /> <!-- valid options: 'rgb8', 'mono8', 'bayer_rggb8' -->
+
+    <param name="image_width" type="int" value="1280" />
+    <param name="image_height" type="int" value="1024" />
+
+    <param name="auto_gain" type="bool" value="False" />
+    <param name="master_gain" type="int" value="100" />
+    <param name="gain_boost" type="bool" value="True" />
+
+    <param name="auto_exposure" type="bool" value="False" />
+    <param name="exposure" type="double" value="0.001" /> <!-- in ms, this will be the initial value in adaptive exposure -->
+
+    <param name="auto_frame_rate" type="bool" value="False" />
+    <param name="frame_rate" type="double" value="20.0" />
+
+    <param name="do_imu_sync" type="bool" value="True" />
+    <param name="adaptive_exposure_mode_" type="int" value="2" /> <!-- Master exposure 2-->
+
+    <param name="flip_upd" type="bool" value="True" />
+    <param name="flip_lr" type="bool" value="True" />
+
+    <param name="pixel_clock" type="int" value="20" />
+    <param name="crop_image" type="bool" value="False" />
+
+  </node>
+
+<!-- Start Ueye cam -->
+  <arg name="nodelet_manager_name_cam1" value="nodelet_manager_cam1" />
+  <arg name="camera_name_cam1" value="cam1" />
+
+  <node pkg="nodelet" type="nodelet" name="$(arg nodelet_manager_name_cam1)" args="manager" output="log"/>
+  <node pkg="nodelet" type="nodelet" name="ddd_cam_nodelet_cam1" args="load ueye_cam/ueye_cam_nodelet $(arg nodelet_manager_name_cam1)" output="log" launch-prefix="taskset -c 1">
+    
+    <param name="camera_name" type="str" value="$(arg camera_name_cam1)" /> <!-- == namespace for topics and services -->
+    <param name="camera_topic" type="str" value="image_raw" />
+    <param name="camera_id" type="int" value="2" /> <!-- 0 = any camera; 1+: camera ID -->
+    <param name="frame_name" type="str" value="camera1" /> <!-- frame_id in image_raw header -->
+
+    <param name="ext_trigger_mode" type="bool" value="True" />
+    <param name="color_mode" type="str" value="mono8" /> <!-- valid options: 'rgb8', 'mono8', 'bayer_rggb8' -->
+
+    <param name="image_width" type="int" value="1280" />
+    <param name="image_height" type="int" value="1024" />
+
+    <param name="auto_gain" type="bool" value="False" />
+    <param name="master_gain" type="int" value="100" />
+    <param name="gain_boost" type="bool" value="True" />
+
+    <param name="auto_exposure" type="bool" value="False" />
+    <param name="exposure" type="double" value="0.001" /> <!-- in ms, this will be the initial value in adaptive exposure -->
+
+    <param name="auto_frame_rate" type="bool" value="False" />
+    <param name="frame_rate" type="double" value="20.0" />
+
+    <param name="do_imu_sync" type="bool" value="True" />
+    <param name="adaptive_exposure_mode_" type="int" value="1" /> <!-- slave exposure 1-->
+
+    <param name="flip_upd" type="bool" value="false" />
+    <param name="flip_lr" type="bool" value="false" />
+
+    <param name="pixel_clock" type="int" value="20" />
+    <param name="crop_image" type="bool" value="False" />
+  </node>
+
+
+  <!-- trigger commander for initialising the sychronisation -->
+  <node pkg="ueye_cam" type="trigger_commander_stereo" name="trigger_commander_stereo" output="log" launch-prefix="taskset -c 1"/>
+
+  <!-- Stereo process using cuda -->
+  <node pkg="nodelet" type="nodelet" name="ddd_stereo_nodelet_manager" args="manager" output="log" launch-prefix="taskset -c 3"/>
+  <node pkg="nodelet" type="nodelet" name="ddd_stereo" args="load tegra_stereo/tegra_stereo_proc ddd_stereo_nodelet_manager" launch-prefix="taskset -c 3">
+	<!-- for more info on P1, P2 see http://www.sciencedirect.com/science/article/pii/S1877050916306561?via%3Dihub and https://github.com/dhernandez0/sgm-->
+	<param name="P1" type="int" value="20" /> <!-- Stereo matching param: Penalties for small disparity changes working: 7-->
+        <param name="P2" type="int" value="100" /> <!-- Stereo matching param: Penalties for large discontinuities working: 86-->
+        <param name="rectify_images" type="bool" value="true" /> <!-- LIMITATION: if disparity is calculated it may limit the frame rate of rectified images -->
+        <param name="queue_size" type="int" value="1" /> <!-- input images queue size, set to 1 for realtime -->
+        <param name="out_frame_id" type="string" value="camera" /> <!-- override header frame id for output messages, if empty left input image frame id will be used -->
+	<param name="filter_thresh" type="int" value="15" /> <!-- disparity image gradient higher than the value will be removed. 12-->
+
+        <!-- camera calibration can be supplied as files below or if files are not specified camera_info messages will be used -->
+        <param name="camera_calibration_file_left" type="str" value="$(find tegra_stereo)/cfg/left.yaml" />
+        <param name="camera_calibration_file_right" type="str" value="$(find tegra_stereo)/cfg/right.yaml" />
+
+        <remap to="cam0/camera_info" from="/stereo/left/camera_info"/>
+        <remap to="cam1/camera_info" from="/stereo/right/camera_info"/>
+        <remap to="cam0/image_raw" from="/stereo/left/image_raw"/>
+        <remap to="cam1/image_raw" from="/stereo/right/image_raw"/>
+        <remap to="ddd_depth/points" from="/ddd_stereo/points2"/>
+  </node>
+
+  <node name="vins" pkg="vins" type="vins_node" args="$(find vins)/../config/dronedroid/stereo_imu_config.yaml" output="screen"/>
+
+  <node name="rvizvisualisation" pkg="rviz" type="rviz" output="log" args="-d $(find vins)/../config/vins_rviz_config.rviz" />
+</launch>
